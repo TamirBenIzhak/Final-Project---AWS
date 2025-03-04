@@ -2,13 +2,20 @@ pipeline {
     agent any
 
     environment {
-        AWS_CREDENTIALS = credentials('aws-credentials')  // AWS Credentials stored in Jenkins
+        AWS_CREDENTIALS = credentials('aws-credentials')  
     }
 
     stages {
-        stage('Clone Repository') {
+        stage('Clone Repositories') {
             steps {
-                git credentialsId: 'github-token', url: 'https://github.com/TamirBenIzhak/CICD-Project.git'
+                cleanWs()
+                script {
+                    //  Clone the main Final Project AWS repository
+                    sh 'git clone https://github.com/TamirBenIzhak/Final-Project---AWS.git aws-repo'
+
+                    //  Clone the CICD-Project repository which contains k8s folder
+                    sh 'git clone https://github.com/TamirBenIzhak/CICD-Project.git cicd-repo'
+                }
             }
         }
 
@@ -16,8 +23,19 @@ pipeline {
             steps {
                 script {
                     sh '''
-                    echo "Updating kubeconfig for EKS Cluster..."
+                    echo " Updating kubeconfig for EKS Cluster..."
                     aws eks update-kubeconfig --name eks-cluster --region us-east-1
+                    '''
+                }
+            }
+        }
+
+        stage('Apply ConfigMap and Secrets') {
+            steps {
+                script {
+                    sh '''
+                    echo " Applying ConfigMap and Secrets..."
+                    kubectl apply -f cicd-repo/k8s/configmap-and-secret.yaml
                     '''
                 }
             }
@@ -27,28 +45,28 @@ pipeline {
             steps {
                 script {
                     sh '''
-                    echo "Deploying MySQL..."
-                    kubectl apply -f k8s/mysql-pv.yaml
-                    kubectl apply -f k8s/mysql-pvc.yaml
-                    kubectl apply -f k8s/mysql_deployment.yaml
-                    kubectl apply -f k8s/mysql_service.yaml
+                    echo " Deploying MySQL..."
+                    kubectl apply -f cicd-repo/k8s/mysql-pv.yaml
+                    kubectl apply -f cicd-repo/k8s/mysql-pvc.yaml
+                    kubectl apply -f cicd-repo/k8s/mysql_deployment.yaml
+                    kubectl apply -f cicd-repo/k8s/mysql_service.yaml
 
-                    echo "Waiting for MySQL to become ready..."
+                    echo " Waiting for MySQL to become ready..."
                     kubectl rollout status statefulset/mysql
                     '''
                 }
             }
-        }    
+        }
 
         stage('Deploy Flask App to Kubernetes') {
             steps {
                 script {
                     sh '''
-                    echo "Deploying Flask App..."
-                    kubectl apply -f k8s/deployment.yaml
-                    kubectl apply -f k8s/service.yaml
+                    echo " Deploying Flask App..."
+                    kubectl apply -f cicd-repo/k8s/flask-app-deployment.yaml
+                    kubectl apply -f cicd-repo/k8s/service.yaml
 
-                    echo "Waiting for Flask app to become ready..."
+                    echo " Waiting for Flask app to become ready..."
                     kubectl rollout status deployment/flask-app
                     '''
                 }
@@ -59,12 +77,21 @@ pipeline {
             steps {
                 script {
                     sh '''
-                    echo "Checking running services and pods..."
-                    kubectl get pods
-                    kubectl get services
+                    echo " Checking running pods and services..."
+                    kubectl get pods -o wide
+                    kubectl get services -o wide
                     '''
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo " Deployment successful! Contacts app is running on EKS "
+        }
+        failure {
+            echo " Deployment failed! Check logs for errors."
         }
     }
 }
