@@ -7,7 +7,7 @@ resource "aws_instance" "jenkins" {
   instance_type           = "t2.micro"
   key_name                = "First-Instance"
   vpc_security_group_ids  = ["sg-0b55c48dc2d2be1b9"]
-  associate_public_ip_address = false  # Don't assign public IP, we will use EIP
+  associate_public_ip_address = false  
 
   iam_instance_profile    = "Jenkins-Instance-Role"
 
@@ -25,7 +25,7 @@ resource "aws_instance" "jenkins" {
 data "aws_eip" "existing_jenkins_eip" {
   filter {
     name   = "allocation-id"
-    values = ["eipalloc-0f0ec1eca06786b5c"]  # ✅ Available EIP
+    values = ["eipalloc-0f0ec1eca06786b5c"]  
   }
 }
 

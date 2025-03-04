@@ -34,12 +34,11 @@ module "vpc" {
   }
 }
 
-# Allocate a new Elastic IP for NAT Gateway
+
 resource "aws_eip" "nat_eip" {
   domain = "vpc"
 }
 
-# NAT Gateway creation
 resource "aws_nat_gateway" "this" {
   allocation_id = aws_eip.nat_eip.id  
   subnet_id     = module.vpc.public_subnets[0]
@@ -47,7 +46,7 @@ resource "aws_nat_gateway" "this" {
   depends_on = [aws_eip.nat_eip]
 }
 
-# IAM Role for EKS Cluster
+
 resource "aws_iam_role" "eks_cluster_role" {
   name = "eks-cluster-role"
 
@@ -63,21 +62,21 @@ resource "aws_iam_role" "eks_cluster_role" {
   })
 }
 
-# Attach policies to the EKS IAM role
+
 resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
   role       = aws_iam_role.eks_cluster_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
-# EKS Cluster
+
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
   cluster_name    = "eks-cluster"
   cluster_version = "1.31"
 
   vpc_id                  = module.vpc.vpc_id
-  subnet_ids              = module.vpc.private_subnets   # Worker nodes in private subnets
-  control_plane_subnet_ids = module.vpc.private_subnets  # Control plane in private subnets
+  subnet_ids              = module.vpc.private_subnets  
+  control_plane_subnet_ids = module.vpc.private_subnets  
 
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
@@ -102,12 +101,12 @@ module "eks" {
   authentication_mode = "API_AND_CONFIG_MAP"
 }
 
-# Output the cluster endpoint
+
 output "cluster_endpoint" {
   value = module.eks.cluster_endpoint
 }
 
-# Output the kubeconfig command
+
 output "kubeconfig_command" {
   value = "aws eks update-kubeconfig --name ${module.eks.cluster_name} --region us-east-1"
 }
