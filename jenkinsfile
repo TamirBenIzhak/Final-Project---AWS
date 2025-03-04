@@ -1,0 +1,70 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_CREDENTIALS = credentials('aws-credentials')  // AWS Credentials stored in Jenkins
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git credentialsId: 'github-token', url: 'https://github.com/TamirBenIzhak/Full-Stack-FLASK-Project---Tamir-Ben-Izhak.git'
+            }
+        }
+
+        stage('Configure AWS & K8s Authentication') {
+            steps {
+                script {
+                    sh '''
+                    echo "Updating kubeconfig for EKS Cluster..."
+                    aws eks update-kubeconfig --name eks-cluster --region us-east-1
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy MySQL to Kubernetes') {
+            steps {
+                script {
+                    sh '''
+                    echo "Deploying MySQL..."
+                    kubectl apply -f k8s/mysql-pv.yaml
+                    kubectl apply -f k8s/mysql-pvc.yaml
+                    kubectl apply -f k8s/mysql_deployment.yaml
+                    kubectl apply -f k8s/mysql_service.yaml
+
+                    echo "Waiting for MySQL to become ready..."
+                    kubectl rollout status statefulset/mysql
+                    '''
+                }
+            }
+        }    
+
+        stage('Deploy Flask App to Kubernetes') {
+            steps {
+                script {
+                    sh '''
+                    echo "Deploying Flask App..."
+                    kubectl apply -f k8s/deployment.yaml
+                    kubectl apply -f k8s/service.yaml
+
+                    echo "Waiting for Flask app to become ready..."
+                    kubectl rollout status deployment/flask-app
+                    '''
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    sh '''
+                    echo "Checking running services and pods..."
+                    kubectl get pods
+                    kubectl get services
+                    '''
+                }
+            }
+        }
+    }
+}
